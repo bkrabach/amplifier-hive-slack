@@ -112,7 +112,7 @@ class InProcessSessionManager:
                                 "channel-search",
                                 "team-chatter",
                             ],
-                            "realtime_response": False,
+                            "realtime_response": True,
                             "discovery": {"mdns": False},
                             "known_agents": [
                                 {
