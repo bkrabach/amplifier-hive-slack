@@ -117,22 +117,22 @@ class InProcessSessionManager:
                             "known_agents": [
                                 {
                                     "name": "ai-os",
-                                    "url": "http://localhost:8210",
+                                    "url": "http://spark-1:8210",
                                     "tier": "trusted",
                                 },
                                 {
                                     "name": "lifeline",
-                                    "url": "http://localhost:8211",
+                                    "url": "http://spark-1:8211",
                                     "tier": "trusted",
                                 },
                                 {
                                     "name": "lifeline-demo",
-                                    "url": "http://localhost:8212",
+                                    "url": "http://spark-1:8212",
                                     "tier": "trusted",
                                 },
                                 {
                                     "name": "cortex",
-                                    "url": "http://localhost:8214",
+                                    "url": "http://spark-1:8214",
                                     "tier": "trusted",
                                 },
                             ],
