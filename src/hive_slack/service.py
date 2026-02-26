@@ -86,6 +86,88 @@ class InProcessSessionManager:
             bundle = bundle.compose(orchestrator_overlay)
             logger.info("Using loop-interactive orchestrator (injection support)")
 
+            # Add A2A support (agent-to-agent mesh communication)
+            a2a_overlay = Bundle(
+                name="a2a-overlay",
+                version="0.0.1",
+                hooks=[
+                    {
+                        "module": "hooks-a2a-server",
+                        "source": "git+https://github.com/microsoft/amplifier-bundle-a2a@main#subdirectory=modules/hooks-a2a-server",
+                        "config": {
+                            "port": 8213,
+                            "agent_name": "hive-slack",
+                            "agent_description": (
+                                "General-purpose coding and development agent living in Slack. "
+                                "Full command-line access with bash, filesystem, web search, and "
+                                "multi-agent delegation. Can handle heavy coding tasks, code review, "
+                                "file generation, and technical research. Also sees Slack channel "
+                                "conversations and message history."
+                            ),
+                            "agent_skills": [
+                                "code-execution",
+                                "file-generation",
+                                "technical-research",
+                                "code-review",
+                                "channel-search",
+                                "team-chatter",
+                            ],
+                            "realtime_response": False,
+                            "discovery": {"mdns": False},
+                            "known_agents": [
+                                {
+                                    "name": "ai-os",
+                                    "url": "http://localhost:8210",
+                                    "tier": "trusted",
+                                },
+                                {
+                                    "name": "lifeline",
+                                    "url": "http://localhost:8211",
+                                    "tier": "trusted",
+                                },
+                                {
+                                    "name": "lifeline-demo",
+                                    "url": "http://localhost:8212",
+                                    "tier": "trusted",
+                                },
+                                {
+                                    "name": "cortex",
+                                    "url": "http://localhost:8214",
+                                    "tier": "trusted",
+                                },
+                            ],
+                        },
+                    }
+                ],
+                tools=[
+                    {
+                        "module": "tool-a2a",
+                        "source": "git+https://github.com/microsoft/amplifier-bundle-a2a@main#subdirectory=modules/tool-a2a",
+                    }
+                ],
+            )
+            bundle = bundle.compose(a2a_overlay)
+            logger.info("A2A mesh enabled on port 8213 (hive-slack)")
+
+            # Add context-intelligence behaviors (CXDB session analysis)
+            for cxdb_behavior in [
+                "git+https://github.com/colombod/amplifier-bundle-context-intelligence@main#subdirectory=behaviors/context-intelligence.yaml",
+                "git+https://github.com/colombod/amplifier-bundle-context-intelligence@main#subdirectory=behaviors/blob-navigation.yaml",
+            ]:
+                try:
+                    cxdb_bundle = await load_bundle(cxdb_behavior)
+                    bundle = bundle.compose(cxdb_bundle)
+                    logger.info(
+                        "Composed context-intelligence behavior: %s",
+                        cxdb_behavior.split("/")[-1],
+                    )
+                except Exception:
+                    logger.warning(
+                        "Could not load context-intelligence behavior: %s",
+                        cxdb_behavior,
+                        exc_info=True,
+                    )
+
             logger.info("Preparing bundle '%s'...", bundle_name)
             self._prepared[bundle_name] = await bundle.prepare()
 
@@ -94,6 +176,19 @@ class InProcessSessionManager:
             len(self._prepared),
             len(self._config.instances),
         )
+
+        # Warm-up: create a session for the default instance so that hooks
+        # (like the A2A server) start immediately rather than lazily on first message.
+        default_inst = self._config.default_instance
+        if default_inst:
+            try:
+                await self._get_or_create_session(default_inst, "_warmup")
+                logger.info(
+                    "Warm-up session created for '%s' (A2A server should be listening)",
+                    default_inst,
+                )
+            except Exception:
+                logger.warning("Warm-up session creation failed", exc_info=True)
 
     @staticmethod
     def _detect_provider() -> dict | None:
