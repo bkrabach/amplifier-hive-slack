@@ -26,6 +26,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _LOOP_INTERACTIVE_SOURCE = str(_PROJECT_ROOT / "modules" / "loop-interactive")
 
 
+def conversation_working_dir(base_working_dir: str, conversation_id: str) -> Path:
+    """Compute per-conversation working directory to isolate filesystem between threads."""
+    safe_id = conversation_id.replace(":", "_").replace("/", "_")
+    return Path(base_working_dir).expanduser() / safe_id
+
+
 class InProcessSessionManager:
     """Manages Amplifier sessions in-process using amplifier-core directly.
 
@@ -444,8 +450,22 @@ class InProcessSessionManager:
                     f"(instance '{instance_name}')"
                 )
 
-            working_dir = Path(instance.working_dir).expanduser()
+            working_dir = conversation_working_dir(
+                instance.working_dir, conversation_id
+            )
             working_dir.mkdir(parents=True, exist_ok=True)
+
+            # Symlink parent AGENTS.md so Amplifier discovers project-level
+            # instructions in per-conversation subdirectories.
+            base_dir = Path(instance.working_dir).expanduser()
+            for agents_name in ("AGENTS.md", ".amplifier"):
+                src = base_dir / agents_name
+                dst = working_dir / agents_name
+                if src.exists() and not dst.exists():
+                    try:
+                        dst.symlink_to(src)
+                    except OSError:
+                        pass  # non-fatal (permissions, Windows FS limits)
 
             logger.info(
                 "Creating session for %s in %s (bundle=%s, cwd=%s)",
